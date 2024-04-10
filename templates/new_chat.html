@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatGPT</title>
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f4f4f4;
+}
+
+.chat-container {
+  width: 300px;
+  margin: 20px auto;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.chat-header {
+  background-color: #007bff;
+  color: #fff;
+  padding: 10px;
+  text-align: center;
+}
+
+.chat-body {
+  padding: 10px;
+  height: 300px;
+  overflow-y: scroll;
+}
+
+.chat-message {
+  margin-bottom: 10px;
+}
+
+.user-message {
+  background-color: #f1f1f1;
+  color: #333;
+  padding: 10px;
+  border-radius: 5px;
+  float: right;
+  clear: both;
+}
+
+.bot-message {
+  background-color: #007bff;
+  color: #fff;
+  padding: 10px;
+  border-radius: 5px;
+  float: left;
+  clear: both;
+}
+</style>
+</head>
+<body>
+<div class="chat-container">
+  <div class="chat-header">
+    <h2>ChatGPT</h2>
+  </div>
+  <div class="chat-body" id="chat-body">
+    <div class="bot-message">Hola, ¿en qué puedo ayudarte?</div>
+  </div>
+  <div class="chat-footer">
+    <input type="text" id="user-input" placeholder="Escribe tu mensaje...">
+    <button onclick="sendMessage()">Enviar</button>
+  </div>
+</div>
+
+<script>
+function sendMessage() {
+  var userInput = document.getElementById("user-input").value;
+  if (userInput.trim() === "") return;
+  
+  var chatBody = document.getElementById("chat-body");
+  var userMessage = '<div class="user-message">' + userInput + '</div>';
+  chatBody.innerHTML += userMessage;
+  
+  // Aquí se puede agregar la lógica para enviar el mensaje del usuario al servidor (backend) y obtener la respuesta del chatbot
+  
+  // Simulando respuesta del chatbot
+  var botMessage = '<div class="bot-message">¡Mensaje del chatbot!</div>';
+  chatBody.innerHTML += botMessage;
+  
+  // Scroll hacia abajo
+  chatBody.scrollTop = chatBody.scrollHeight;
+  // Limpiar el campo de entrada
+  document.getElementById("user-input").value = "";
+}
+</script>
+</body>
+</html>

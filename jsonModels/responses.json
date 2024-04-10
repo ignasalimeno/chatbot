@@ -1,0 +1,182 @@
+{
+  "_id": {
+    "$oid": "6609bb8f5d45c0c3c3c272d0"
+  },
+  "user_id": "123",
+  "date": "",
+  "layers_old": [
+    {
+      "layer_id": "1",
+      "question_id": "pregunta1",
+      "option_id": "a",
+      "next_question": "pregunta2",
+      "sub_layers": [
+        {
+          "layer_id": "1.1",
+          "question_id": "pregunta2",
+          "option_id": "b",
+          "next_question": "pregunta5",
+          "sub_layers": [{}]
+        },
+        {
+          "layer_id": "1.2",
+          "question_id": "pregunta2",
+          "option_id": "c",
+          "next_question": "pregunta8",
+          "sub_layers": [{}]
+        },
+        {
+          "layer_id": "1.3",
+          "question_id": "pregunta2",
+          "option_id": "j",
+          "next_question": "pregunta10",
+          "sub_layers": [{}]
+        }
+      ]
+    },
+    {
+      "layer_id": "2",
+      "option_id": "b",
+      "sub_layers": [{}]
+    },
+    {
+      "layer_id": "3",
+      "option_id": "c",
+      "sub_layers": [{}]
+    }
+  ],
+  "layers_example": [
+    {
+      "layer_id": "1",
+      "last_layer_id": "",
+      "last_option_id": "",
+      "question_id": "pregunta1",
+      "option_selected": [
+        {
+          "option_id": "a",
+          "next_question": "pregunta2",
+          "checked": "True"
+        },
+        {
+          "option_id": "b",
+          "next_question": "pregunta3",
+          "checked": "False"
+        },
+        {
+          "option_id": "c",
+          "next_question": "pregunta4",
+          "checked": "False"
+        }
+      ]
+    },
+    {
+      "layer_id": "1.1",
+      "last_layer_id": "1",
+      "last_option_id": "a",
+      "question_id": "pregunta2",
+      "option_selected": [
+        {
+          "option_id": "a",
+          "next_question": "pregunta67",
+          "checked": "True"
+        },
+        {
+          "option_id": "b",
+          "next_question": "pregunta87",
+          "checked": "True"
+        },
+        {
+          "option_id": "c",
+          "next_question": "pregunta55",
+          "checked": "True"
+        }
+      ]
+    },
+    {
+        "layer_id": "1.1.1",
+        "last_layer_id": "1.1",
+        "last_option_id": "a",
+        "question_id": "pregunta67",
+        "option_selected": [
+          {
+            "option_id": "a",
+            "next_question": "",
+            "checked": "True"
+          }
+        ]
+      },
+      {
+        "layer_id": "1.1.2",
+        "last_layer_id": "1.1",
+        "last_option_id": "b",
+        "question_id": "pregunta87",
+        "option_selected": [
+          {
+            "option_id": "h",
+            "next_question": "",
+            "checked": "True"
+          }
+        ]
+      },
+      {
+        "layer_id": "1.1.3",
+        "last_layer_id": "1.1",
+        "last_option_id": "c",
+        "question_id": "pregunta55",
+        "option_selected": [
+          {
+            "option_id": "g",
+            "next_question": "",
+            "checked": "True"
+          }
+        ]
+      }
+  ],
+  "layers": [
+    {
+      "layer_id": "1",
+      "last_layer_id": "",
+      "last_option_id": "",
+      "question_id": "pregunta1",
+      "option_selected": [
+        {
+          "option_id": "a",
+          "next_question": "pregunta2",
+          "next_layer": "1.1",
+          "checked": "False"
+        },
+        {
+          "option_id": "b",
+          "next_question": "pregunta3",
+          "next_layer": "1.2",
+          "checked": "False"
+        },
+        {
+          "option_id": "c",
+          "next_question": "pregunta4",
+          "next_layer": "1.3",
+          "checked": "False"
+        }
+      ]
+    },
+    {
+        "layer_id": "1.1",
+        "last_layer_id": "1",
+        "last_option_id": "a",
+        "question_id": "pregunta2",
+        "option_selected": [
+          ]
+      }
+  ],
+  "layer_route": [{ "layer_id": "1" }, { "layer_id": "1.1" }],
+  "symptoms": [{
+    "symptom_id": "OPRHA:123552"},
+    {
+        "symptom_id": "OPRHA:32942345"}],
+  "responses": [
+    {
+      "question_id": "pregunta1",
+      "option_selected": ""
+    }
+  ]
+}

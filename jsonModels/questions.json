@@ -1,0 +1,53 @@
+{
+    "_id": {
+      "$oid": "6609bab75d45c0c3c3c272c9"
+    },
+    "question_id": "pregunta1",
+    "type": "choice",
+    "end_question": "False",
+    "text": [
+      {
+        "language": "ES",
+        "text": "Esta es la pregunta 1. Desea continuar?"
+      },
+      {
+        "language": "EN",
+        "text": "This is the first question. Do you want to continue?"
+      }
+    ],
+    "comment": "",
+    "options": [
+      {
+        "id": "1",
+        "action": "pregunta2",
+        "text": [
+          {
+            "language": "ES",
+            "text": "Si",
+            "values": "si"
+          },
+          {
+            "language": "EN",
+            "text": "Yes",
+            "values": "yes"
+          }
+        ]
+      },
+      {
+        "id": "2",
+        "action": "pregunta3",
+        "text": [
+          {
+            "language": "ES",
+            "text": "No",
+            "values": "no"
+          },
+          {
+            "language": "EN",
+            "text": "No",
+            "values": "no"
+          }
+        ]
+      }
+    ]
+  }
