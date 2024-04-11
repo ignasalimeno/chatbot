@@ -1,6 +1,5 @@
 from flask import Flask, session, render_template, request, jsonify
 import jwt
-from chat_simple import get_next_answer
 from chatbot_v2 import handler
 
 app = Flask(__name__)
@@ -10,25 +9,6 @@ app.secret_key = "asfasdfasdfasdf"
 def index_get():
     #return render_template("new_chat.html")
     return render_template("base-new.html")
-
-@app.route("/predict", methods = ["POST"])
-def predict():
-    text = request.get_json().get("message")
-
-    # TODO: check if text is valid
-    last_answer_id = ""
-   
-    if not session.get('lastanswerid'):
-        last_answer_id = "P0pxSALUDOxRDCOM_01_SQ"
-    else:
-        last_answer_id = session.get('lastanswerid')
-
-    print(session.get('lastanswerid'))
-    
-    response = get_next_answer(text,last_answer_id)
-    message = {"answer": response}
-
-    return jsonify(message)
 
 @app.route('/generate_token')
 def generate_token():
