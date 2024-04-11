@@ -3,6 +3,8 @@ import os
 import json, random
 from flask import session
 from pymongo import MongoClient
+import datetime
+import secrets
 
 # --- Set variables
 MONGO_DB_PATH= os.environ.get('MONGO_DB_PATH')
@@ -10,6 +12,7 @@ MONGO_DB_NAME=os.environ.get('MONGO_DB_NAME')
 MONGO_DB_COLLECTION_RES=os.environ.get('MONGO_DB_COLLECTION_RES')
 MONGO_DB_COLLECTION_QUE=os.environ.get('MONGO_DB_COLLECTION_QUE')
 FIRST_QUESTION = os.environ.get('FIRST_QUESTION')
+
 
 def get_complete_question(id, language):
     response = db_helper.find_document_by_criteria_rdcom(id)
@@ -81,7 +84,7 @@ def first_question(token, language):
       "option_selected": []
     }
 
-    mydict = { "user_id": token, "date": "", "layers": [first_layer], "sypmtoms": [] }
+    mydict = { "user_id": token, "date": datetime.datetime.now(), "layers": [first_layer], "sypmtoms": [] }
 
     x = collection.insert_one(mydict)        
     if x:
@@ -143,7 +146,6 @@ def middle_question(text, token, language):
         if validate_options(selected_options, last_layer["question_id"],language) == False:
             raise Exception()
 
-
         print("last layer")
         print(last_layer)
 
@@ -196,6 +198,7 @@ def middle_question(text, token, language):
         return "Hubo un error, por favor responda nuevamente"
 
 def save_next_layer(token, layer_id):
+    print("token: " + token)
     client = MongoClient(MONGO_DB_PATH)
     db = client[MONGO_DB_NAME]  # Replace 'your_database' with your database name
     collection = db[MONGO_DB_COLLECTION_RES]  # Replace 'your_collection' with your collection name
@@ -236,19 +239,20 @@ def save_next_layer(token, layer_id):
 
             if existPendingOptions == False:
                 #TODO: actualizar dónde stoy parado
-                query = { "layers.layer_id": layer_id }
+                 
+                query = { "user_id": token, "layers.layer_id": layer_id }
                 update = {"$set": {"layers.$.checked": "True"}}
                 result = collection.update_one(query, update)
                 
                 #TODO: actualizar en layer anterior la opción que estoy parado
                 last_layer_id = layer["last_layer_id"]
                 last_question_id = layer["question_id"]
-                query = {"layers.layer_id": last_layer_id, "layers.option_selected.next_question": last_question_id}
+                query = { "user_id": token, "layers.layer_id": last_layer_id, "layers.option_selected.next_question": last_question_id}
                 
                 update = {"$set": {"layers.$.option_selected.$[elem].checked": "True"}}
                 array_filters = [{"elem.next_question": last_question_id}]
-                print(query)
-                print(update)
+                #print(query)
+                #print(update)
                 result = collection.update_one(query, update, array_filters=array_filters)
                 
                 question_id = save_next_layer(token, last_layer_id)
@@ -271,16 +275,35 @@ def last_question():
     return text
 
 def handler(texto, token, language):
-    
+    if token is None:
+        token = secrets.token_hex(20)
+
     if db_helper.check_if_token_exist(token):
-        print("token existe")
-        return middle_question(texto, token, language)
-        
+        if check_token(token):
+            return middle_question(texto, token, language), None
+        else:
+            token = secrets.token_hex(20)
+            return first_question(token, language), token
     else:
+        
+        return first_question(token, language), token
 
-        print("token existe")
-        return first_question(token, language)
-        # print("token no existe")
-        # return first_question(texto, language)
+def check_token(token):
+    response_saved = db_helper.find_response_by_user(token)
+    saved_time = response_saved["date"]
+    seconds = (datetime.datetime.now() - saved_time).total_seconds()
 
-    return None
+    if seconds <= 5000:
+      
+        client = MongoClient(MONGO_DB_PATH)
+        db = client[MONGO_DB_NAME]  # Replace 'your_database' with your database name
+        collection = db[MONGO_DB_COLLECTION_RES]  # Replace 'your_collection' with your collection name
+
+        query = {"user_id": token}
+        update = {"$set": {f"date": datetime.datetime.now()}}
+
+        result = collection.update_one(query, update)
+
+        return True
+    else: 
+        return None
