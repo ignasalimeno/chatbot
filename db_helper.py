@@ -2,8 +2,12 @@ from pymongo import MongoClient
 import os
 
 # --- Set variables
-MONGO_DB_PATH= os.environ.get('MONGO_DB_PATH')
-MONGO_DB_NAME=os.environ.get('MONGO_DB_NAME')
+# MONGO_DB_PATH= os.environ.get('MONGO_DB_PATH')
+# MONGO_DB_NAME=os.environ.get('MONGO_DB_NAME')
+# MONGO_DB_PATH = 'mongodb+srv://ignacio:3DCWrdMyumZEvfNm@rdcom-bot-questions.2wk6eiw.mongodb.net/'
+# MONGO_DB_NAME = 'rdcom-bot'
+MONGO_DB_PATH='mongodb://localhost:27017/'
+MONGO_DB_NAME='rdcom'
 MONGO_DB_COLLECTION_RES=os.environ.get('MONGO_DB_COLLECTION_RES')
 MONGO_DB_COLLECTION_QUE=os.environ.get('MONGO_DB_COLLECTION_QUE')
 

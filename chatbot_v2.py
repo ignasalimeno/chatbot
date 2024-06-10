@@ -1,4 +1,4 @@
-import db_helper
+import db_helper, postgre_helper
 import os
 import json, random
 from flask import session
@@ -7,8 +7,12 @@ import datetime
 import secrets
 
 # --- Set variables
-MONGO_DB_PATH= os.environ.get('MONGO_DB_PATH')
-MONGO_DB_NAME=os.environ.get('MONGO_DB_NAME')
+# MONGO_DB_PATH= os.environ.get('MONGO_DB_PATH')
+# MONGO_DB_NAME=os.environ.get('MONGO_DB_NAME')
+#MONGO_DB_PATH = 'mongodb+srv://ignacio:3DCWrdMyumZEvfNm@rdcom-bot-questions.2wk6eiw.mongodb.net/'
+#MONGO_DB_NAME = 'rdcom-bot'
+MONGO_DB_PATH='mongodb://localhost:27017/'
+MONGO_DB_NAME='rdcom'
 MONGO_DB_COLLECTION_RES=os.environ.get('MONGO_DB_COLLECTION_RES')
 MONGO_DB_COLLECTION_QUE=os.environ.get('MONGO_DB_COLLECTION_QUE')
 FIRST_QUESTION = os.environ.get('FIRST_QUESTION')
@@ -26,12 +30,6 @@ def get_complete_question(id, language):
         for txt in response["text"]:
             if txt["language"] == language:
                 text = text + txt["text"]
-
-        #Agrego las opciones de la pregunta
-        for options in response["options"]:
-            for txt in options["text"]:
-                if txt["language"] == language:
-                    text = text + "\n" + txt["text"]
 
         return text
     else: 
@@ -69,6 +67,93 @@ def save_new_response(user_id, selected_value, next_question):
     
     return result.modified_count
 
+def list2query(list):
+    try:
+        query = ""
+        for i in range(len(list)-1):
+            query += ("'" + list[i][0] + "',")
+        query += "'" + list[len(list)-1][0] + "'"
+        return query
+    except:
+        print("error")
+
+def get_categories():
+    list_cats = []
+    rows = postgre_helper.readDB("select cat_id, name from public.categories where type = 'system'")
+    return rows
+
+def get_subcategories(list_cat):
+    cats = ""
+    for cat in list_cat:
+        cats += "'" + cat + "',"
+    cats = cats[:len(cats)-1]
+    
+    print("cats", cats)
+
+    query = "select cat_id, name from public.categories where cat_id in " + \
+                "(select cat_id_2 from public.categories_categories where cat_id_1 in (" + cats + "))"
+    
+    rows = postgre_helper.readDB(query)
+
+    if len(rows) > 0:
+        return rows
+    
+    return None
+
+def get_sympthoms(list_pat, list_subcat):
+    query_1 = "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_subcat[0] + \
+                            "' and pat_id in (" + list2query(list_pat) + ")"
+    
+    query_2 = "select distinct sym_id from public.pathologies_symptoms where pat_id in (" + query_1
+    query_2 += ") and sym_id in (select distinct sym_id from public.categories_symptoms where cat_id in ('" + list_subcat[0] + "'))"
+
+    query_2_2 = "select sym_id, name from public.symptoms where sym_id in (" + query_2 + ")"
+    list_symp = postgre_helper.readDB(query_2_2)
+
+    if len(list_symp):
+        return list_symp
+    
+    return None
+
+def get_pat_from_subcategories(list_pat, list_subcat):
+    query_1 = "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_subcat[0] + \
+                            "' and pat_id in (" + list2query(list_pat) + ")"
+    query_1_2 = "select pat_id, name from public.pathologies where pat_id in (" + query_1 + ")" 
+    list_pat = postgre_helper.readDB(query_1_2)
+    if len(list_pat) > 0:
+        return list_pat
+
+    return None
+
+def get_pat_from_categories(list_cat):
+    query = ""
+    if len(list_cat) > 1:
+        for i in range(len(list_cat) - 1):
+            query += "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_cat[i] + "' and pat_id in ("
+        query += "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_cat[len(list_cat)-1] + "'"
+        query += ")))))))))))))"[-(len(list_cat)-1):]
+        list_pat = postgre_helper.readDB(query)
+    else:
+        query = "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_cat[0]
+        list_pat = postgre_helper.readDB(query)
+
+    if len(list_pat) > 0:
+        return list_pat
+    else:
+        return None
+    
+def get_pat_from_symptoms(list_pat,sym):
+    query = ""
+    query += "select * from public.pathologies where pat_id in ( "
+    query += "select pat_id from public.pathologies_symptoms where sym_id = '" + sym[0] + "' and pat_id in (" + list2query(list_pat)
+    query += "))"
+    list_pat = postgre_helper.readDB(query)
+
+    if len(list_pat) > 0:
+        return list_pat
+    else:
+        return None
+
 def first_question(token, language):
     # --- Insertar un elemento vacío
     client = MongoClient(MONGO_DB_PATH)
@@ -76,22 +161,35 @@ def first_question(token, language):
     collection = db[MONGO_DB_COLLECTION_RES]  # Replace 'your_collection' with your collection name
 
     first_layer = {
-      "layer_id": "1",
-      "last_layer_id": "",
-      "last_option_id": "",
-      "question_id": "pregunta1",
-      "checked": "False",
-      "option_selected": []
+        "cat": [],
+        "sub_cat": [],
+        "sym": [],
+        "sub_sub_cat": [],
+        "pat": []
     }
 
-    mydict = { "user_id": token, "date": datetime.datetime.now(), "layers": [first_layer], "sypmtoms": [] }
+    ques_options = []
+    questions = [{"question_id": "pregunta1", "options": ques_options}]
 
-    x = collection.insert_one(mydict)        
-    if x:
-        response = get_complete_question(FIRST_QUESTION, language)
+    mydict = { "user_id": token, "date": datetime.datetime.now(), "data": first_layer, "last_question": "pregunta1", "questions": questions }
+
+    response = get_complete_question(FIRST_QUESTION, language)
+
+    options = get_categories()
     
-    if response:
-        return response
+    for i in range(len(options) -1):
+        data = {"id": i+1, "value": str(options[i][1]), "db_id": str(options[i][0])}
+        ques_options.append(data)
+
+        response = response + "<br>" + str(i+1) + ") " + str(options[i][1])
+    
+    x = collection.insert_one(mydict)        
+
+    if x:
+        if response:
+            return response
+        else: 
+            return None    
     else: 
         return None
     
@@ -130,21 +228,49 @@ def validate_options(user_options, question_id, language):
         return allCorrectOptions
     except:
         return None
-    
-def middle_question(text, token, language):
+
+def middle_question_bkp(text, token, language):
     try:
         #separo las opciones recibidas
         selected_options = get_options_for_text(text)
 
-        #TODO: validar que las opciones elegidas estén dentro de las opciones posibles
-
         #obtengo el elemento completo del usuario y me traigo la ultima layer
         response_saved = db_helper.find_response_by_user(token)
+
+        #obtengo la ultima pregunta para saber que tipo de pregunta tengo que mostrar
+        last_question = response_saved["last_question"]
+
+        if last_question == "pregunta1":
+            print("Pregunta 1")
+
+        #--- PASO A PASO
+        # 1) tomar la respuesta, separarla en diferentes valores
+        # 2) con la "last_question", buscar en la respuesta del usuario y ver que opciones eligio y que ids son
+        # 3) guardo las cat en la data del json y proceso la busqueda de patologias 
+        # 4) traigo las sub categorias de esos sintomas elegidos y los tengo que presentar
+
+        #--- Paso 2 -----
+        rta_selected = []
+        last_options = []
+        questions = response_saved["questions"]
+        for quest in questions:
+            if quest["question_id"] == last_question:
+                last_options = quest["options"]
+        
+        for sel_opt in selected_options:
+            for opt in last_options:
+                if opt["id"] == sel_opt:
+                    rta_selected.append(str(opt["db_id"]))
+        #---------------
+
+        print(rta_selected)
+
         layers = response_saved["layers"]
         last_layer = layers[len(layers)-1]
 
-        if validate_options(selected_options, last_layer["question_id"],language) == False:
-            raise Exception()
+        # TODO: revisar el validate
+        # if validate_options(selected_options, last_layer["question_id"],language) == False:
+        #     raise Exception()
 
         print("last layer")
         print(last_layer)
@@ -194,6 +320,203 @@ def middle_question(text, token, language):
         else:
             return last_question()
         # -----------------------------------------------
+    except:
+        return "Hubo un error, por favor responda nuevamente"
+
+def middle_question(text, token, language):
+    try:
+        client = MongoClient(MONGO_DB_PATH)
+        db = client[MONGO_DB_NAME]  # Replace 'your_database' with your database name
+        collection = db[MONGO_DB_COLLECTION_RES]  # Replace 'your_collection' with your collection name
+
+        #separo las opciones recibidas
+        selected_options = get_options_for_text(text)
+
+        #obtengo el elemento completo del usuario y me traigo la ultima layer
+        response_saved = db_helper.find_response_by_user(token)
+
+        #obtengo la ultima pregunta para saber que tipo de pregunta tengo que mostrar
+        last_question = response_saved["last_question"]
+
+        if last_question == "pregunta1":
+            print("Pregunta 1")
+            #--- PASO A PASO
+            # 1) tomar la respuesta, separarla en diferentes valores
+            # 2) con la "last_question", buscar en la respuesta del usuario y ver que opciones eligio y que ids son
+            # 3) guardo las cat en la data del json y proceso la busqueda de patologias 
+            # 4) traigo las sub categorias de esos sintomas elegidos y los tengo que presentar
+
+            #--- Paso 2 -----
+            rta_selected = []
+            last_options = []
+            questions = response_saved["questions"]
+            
+            for quest in questions:
+                if quest["question_id"] == last_question:
+                    last_options = quest["options"]
+            
+            for sel_opt in selected_options:
+                for opt in last_options:
+                    if str(opt["id"]) == sel_opt:
+                        rta_selected.append(str(opt["db_id"]))
+            #---------------
+
+            #--- Paso 3 -----
+            query = {"user_id": token}
+            update = {"$set": {f"data.cat": rta_selected}}
+            result = collection.update_one(query, update)
+            
+            # TODO: Agregar busqueda de pat
+            list_pat = get_pat_from_categories(rta_selected)
+            query = {"user_id": token}
+            update = {"$set": {f"data.pat": list_pat}}
+            result = collection.update_one(query, update)
+            response = "Se encontraron {} patologías compatibles. <br>".format(len(list_pat))
+
+            #--- Paso 4 -----
+
+            #busco sub cat
+            list_subcats = get_subcategories(rta_selected)
+            response += get_complete_question("pregunta2", language)
+            
+            ques_options = []
+            question = {"question_id": "pregunta2", "options": ques_options}
+
+            for i in range(len(list_subcats) -1):
+                data = {"id": i+1, "value": str(list_subcats[i][1]), "db_id": str(list_subcats[i][0])}
+                ques_options.append(data)
+                response = response + "<br>" + str(i+1) + ") " + str(list_subcats[i][1])
+            
+            query = {"user_id": token}
+            update = {"$push": {"questions": question}}
+            result = collection.update_one(query, update)
+
+            #Actualizo last_question
+            query = { "user_id": token}
+            update = {"$set": {"last_question": "pregunta2"}}
+            result = collection.update_one(query, update)
+            
+            if result:
+                return response
+            
+        ## --- Pregunta 2
+        if last_question == "pregunta2":
+            print("Pregunta 2")
+            #--- PASO A PASO
+            # 1) tomar la respuesta, separarla en diferentes valores
+            # 2) con la "last_question", buscar en la respuesta del usuario y ver que opciones eligio y que ids son
+            # 3) guardo las cat en la data del json y proceso la busqueda de patologias 
+            # 4) traigo las sub categorias de esos sintomas elegidos y los tengo que presentar
+
+            #--- Paso 2 -----
+            rta_selected = []
+            last_options = []
+            questions = response_saved["questions"]
+            
+            for quest in questions:
+                if quest["question_id"] == last_question:
+                    last_options = quest["options"]
+            
+            for sel_opt in selected_options:
+                for opt in last_options:
+                    if str(opt["id"]) == sel_opt:
+                        rta_selected.append(str(opt["db_id"]))
+            #---------------
+
+            #--- Paso 3 -----
+            query = {"user_id": token}
+            #update = {"$set": {f"data.sub_cat": rta_selected}}
+            update = {"$push": {f"data.sub_cat": rta_selected}}
+            result = collection.update_one(query, update)
+            
+            # TODO: Agregar busqueda de pat
+            list_pat = get_pat_from_subcategories(response_saved["data"]["pat"],rta_selected)
+            query = {"user_id": token}
+            update = {"$set": {f"data.pat": list_pat}}
+            result = collection.update_one(query, update)
+            response = "Se encontraron {} patologías compatibles. <br>".format(len(list_pat))
+            if len(list_pat) < 25:
+                for pat in list_pat:
+                    response += "<br> - " + pat[1]
+
+            #--- Paso 4 -----
+
+            #busco síntomas
+            list_syms = get_sympthoms(response_saved["data"]["pat"],rta_selected)
+            response += get_complete_question("pregunta3", language)
+            
+            ques_options = []
+            question = {"question_id": "pregunta3", "options": ques_options}
+
+            for i in range(len(list_syms) -1):
+                data = {"id": i+1, "value": str(list_syms[i][1]), "db_id": str(list_syms[i][0])}
+                ques_options.append(data)
+                response = response + "<br>" + str(i+1) + ") " + str(list_syms[i][1])
+            
+            query = {"user_id": token}
+            update = {"$push": {"questions": question}}
+            result = collection.update_one(query, update)
+            
+
+            #Actualizo last_question
+            query = { "user_id": token}
+            update = {"$set": {"last_question": "pregunta3"}}
+            result = collection.update_one(query, update)
+
+            if result:
+                return response
+        
+
+
+        if last_question == "pregunta3":
+            print("Pregunta 3")
+            #--- PASO A PASO
+            # 1) tomar la respuesta, separarla en diferentes valores
+            # 2) con la "last_question", buscar en la respuesta del usuario y ver que opciones eligio y que ids son
+            # 3) guardo las cat en la data del json y proceso la busqueda de patologias 
+            # 4) traigo las sub categorias de esos sintomas elegidos y los tengo que presentar
+
+            #--- Paso 2 -----
+            rta_selected = []
+            last_options = []
+            questions = response_saved["questions"]
+            
+            for quest in questions:
+                if quest["question_id"] == last_question:
+                    last_options = quest["options"]
+            
+            for sel_opt in selected_options:
+                for opt in last_options:
+                    if str(opt["id"]) == sel_opt:
+                        rta_selected.append(str(opt["db_id"]))
+            #---------------
+
+            #--- Paso 3 -----
+            query = {"user_id": token}
+            update = {"$set": {f"data.sym": rta_selected}}
+            result = collection.update_one(query, update)
+            
+            # TODO: Agregar busqueda de pat
+            print("llega a buscar pat")
+            list_pat = get_pat_from_symptoms(response_saved["data"]["pat"],rta_selected)
+            query = {"user_id": token}
+            update = {"$set": {f"data.pat": list_pat}}
+            result = collection.update_one(query, update)
+            response = "Se encontraron {} patologías compatibles. <br>".format(len(list_pat))
+            if len(list_pat) < 25:
+                for pat in list_pat:
+                    response += "<br> - " + pat[1]
+
+            #Actualizo last_question
+            query = { "user_id": token}
+            update = {"$set": {"last_question": "pregunta2"}}
+            result = collection.update_one(query, update)
+
+            if result:
+                return response
+    
+       
+        return "ok"
     except:
         return "Hubo un error, por favor responda nuevamente"
 
@@ -280,9 +603,11 @@ def handler(texto, token, language):
 
     if db_helper.check_if_token_exist(token):
         if check_token(token):
+            print("MiddleQuestion")
             return middle_question(texto, token, language), None
         else:
             token = secrets.token_hex(20)
+            print("FirstQuestion")
             return first_question(token, language), token
     else:
         
