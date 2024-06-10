@@ -110,6 +110,7 @@ def get_sympthoms(list_pat, list_subcat):
     query_2_2 = "select sym_id, name from public.symptoms where sym_id in (" + query_2 + ")"
     list_symp = postgre_helper.readDB(query_2_2)
 
+    print("query sym",query_2_2)
     if len(list_symp):
         return list_symp
     
@@ -171,7 +172,15 @@ def first_question(token, language):
     ques_options = []
     questions = [{"question_id": "pregunta1", "options": ques_options}]
 
-    mydict = { "user_id": token, "date": datetime.datetime.now(), "data": first_layer, "last_question": "pregunta1", "questions": questions }
+    mydict = { 
+        "user_id": token, 
+        "date": datetime.datetime.now(), 
+        "data": first_layer, 
+        "last_question": "pregunta1", 
+        "show_data": "false", 
+        "data_2_show": "",
+        "questions": questions 
+    }
 
     response = get_complete_question(FIRST_QUESTION, language)
 
@@ -323,6 +332,13 @@ def middle_question_bkp(text, token, language):
     except:
         return "Hubo un error, por favor responda nuevamente"
 
+def show_data(data,data2show):
+    response = ""
+    if data2show == "pat":
+        for x in data["pat"]:
+            response += ". " + x[1] + "<br>"
+    return response
+
 def middle_question(text, token, language):
     try:
         client = MongoClient(MONGO_DB_PATH)
@@ -337,6 +353,47 @@ def middle_question(text, token, language):
 
         #obtengo la ultima pregunta para saber que tipo de pregunta tengo que mostrar
         last_question = response_saved["last_question"]
+
+        if response_saved["show_data"] == "true":
+            if selected_options[0] == "si":
+                response = show_data(response_saved["data"],response_saved["data_2_show"])
+                response += "Desea agregar más info? (SI/NO)"
+            else:
+                response = "Desea agregar más info? (SI/NO)"
+            query = { "user_id": token}
+            update = {"$set": {"show_data": "moredata", "data_2_show": ""}}
+            result = collection.update_one(query, update)
+            if response:
+                return response
+        
+        if response_saved["show_data"] == "moredata":
+            if selected_options[0] == "si":
+                list_subcats = get_subcategories(response_saved["data"]["cat"])
+                response = get_complete_question("pregunta2", language)
+            
+                ques_options = []
+                question = {"question_id": "pregunta2", "options": ques_options}
+
+                for i in range(len(list_subcats) -1):
+                    data = {"id": i+1, "value": str(list_subcats[i][1]), "db_id": str(list_subcats[i][0])}
+                    ques_options.append(data)
+                    response = response + "<br>" + str(i+1) + ") " + str(list_subcats[i][1])
+                
+                query = {"user_id": token}
+                update = {"$push": {"questions": question}}
+                result = collection.update_one(query, update)
+
+                #Actualizo last_question
+                query = { "user_id": token}
+                update = {"$set": {"last_question": "pregunta2"}}
+                result = collection.update_one(query, update)                           
+            else:
+                response = "Muchas gracias por haber utilizado el RDiBot"
+            query = { "user_id": token}
+            update = {"$set": {"show_data": "false", "data_2_show": ""}}
+            result = collection.update_one(query, update)
+            if response:
+                return response
 
         if last_question == "pregunta1":
             print("Pregunta 1")
@@ -435,10 +492,7 @@ def middle_question(text, token, language):
             update = {"$set": {f"data.pat": list_pat}}
             result = collection.update_one(query, update)
             response = "Se encontraron {} patologías compatibles. <br>".format(len(list_pat))
-            if len(list_pat) < 25:
-                for pat in list_pat:
-                    response += "<br> - " + pat[1]
-
+   
             #--- Paso 4 -----
 
             #busco síntomas
@@ -448,10 +502,16 @@ def middle_question(text, token, language):
             ques_options = []
             question = {"question_id": "pregunta3", "options": ques_options}
 
-            for i in range(len(list_syms) -1):
-                data = {"id": i+1, "value": str(list_syms[i][1]), "db_id": str(list_syms[i][0])}
+            # for i in range(len(list_syms) -1):
+            #     data = {"id": i+1, "value": str(list_syms[i][1]), "db_id": str(list_syms[i][0])}
+            #     ques_options.append(data)
+            #     response = response + "<br>" + str(i+1) + ") " + str(list_syms[i][1])
+            n = 1
+            for sym in list_syms:
+                data = {"id": n, "value": str(sym[1]), "db_id": str(sym[0])}
                 ques_options.append(data)
-                response = response + "<br>" + str(i+1) + ") " + str(list_syms[i][1])
+                response = response + "<br>" + str(n) + ") " + str(sym[1])
+                n += 1
             
             query = {"user_id": token}
             update = {"$push": {"questions": question}}
@@ -503,9 +563,12 @@ def middle_question(text, token, language):
             update = {"$set": {f"data.pat": list_pat}}
             result = collection.update_one(query, update)
             response = "Se encontraron {} patologías compatibles. <br>".format(len(list_pat))
-            if len(list_pat) < 25:
-                for pat in list_pat:
-                    response += "<br> - " + pat[1]
+            response += "<br>Desea ver los datos? (SI/NO)"
+            #Actualizo para mostrar data
+            query = { "user_id": token}
+            update = {"$set": {"show_data": "true", "data_2_show": "pat"}}
+            result = collection.update_one(query, update)
+            
 
             #Actualizo last_question
             query = { "user_id": token}
@@ -517,7 +580,8 @@ def middle_question(text, token, language):
     
        
         return "ok"
-    except:
+    except Exception as e:
+        print(e)
         return "Hubo un error, por favor responda nuevamente"
 
 def save_next_layer(token, layer_id):
