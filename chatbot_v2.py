@@ -167,6 +167,30 @@ def get_pat_from_subcategories(list_pat, list_subcat):
 
     return None
 
+def get_pat_from_subcategories_more(cats, list_subcat):
+    list_total = []
+    for cat in cats:
+        list_total.append(cat)
+
+    for subcat in list_subcat[0]:
+        list_total.append(subcat)
+    print("list total",list_total)
+    # query_1 = get_pat_from_categories(list_total)
+    query = ""
+    for i in range(len(list_total) - 1):
+        query += "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_total[i] + "' and pat_id in ("
+    query += "select distinct pat_id from public.pathologies_categories where cat_id = '" + list_total[len(list_total)-1] + "'"
+    query += ")))))))))))))"[-(len(list_total)-1):]
+    # query_1 = "select distinct pat_id from public.pathologies_categories where cat_id in (" + list2query(list_subcat) + \
+    #                         ") and pat_id in (" + list2query(list_pat) + ")"
+    print("query",query)
+    query_1_2 = "select pat_id, name from public.pathologies where pat_id in (" + query + ")" 
+    list_pat = readDB(query_1_2)
+    if len(list_pat) > 0:
+        return list_pat
+
+    return None
+
 def get_pat_from_categories(list_cat):
     query = ""
     if len(list_cat) > 1:
@@ -212,6 +236,7 @@ def first_question(token, language):
     }
 
     ques_options = []
+    responses = []
     questions = [{"question_id": "pregunta1", "options": ques_options}]
 
     mydict = { 
@@ -221,7 +246,8 @@ def first_question(token, language):
         "last_question": "pregunta1", 
         "show_data": "false", 
         "data_2_show": "",
-        "questions": questions 
+        "questions": questions,
+        "responses": responses 
     }
 
     response = get_complete_question(FIRST_QUESTION, language)
@@ -337,6 +363,43 @@ def get_name_cat(cat_id):
     
     except:
         return None
+    
+def back(questions, token, responses,language,cats, subcats):
+    client = MongoClient(MONGO_DB_PATH)
+    db = client[MONGO_DB_NAME]  # Replace 'your_database' with your database name
+    collection = db[MONGO_DB_COLLECTION_RES]  # Replace 'your_collection' with your collection name
+
+    questions_saved = questions
+    new_questions = []
+    
+    for i in range(len(questions_saved)-2):
+        new_questions.append(questions_saved[i])
+
+    query = {"user_id": token}
+    update = {"$set": {"questions": new_questions}}
+    result = collection.update_one(query, update)
+
+    query = {"user_id": token}
+    update = {"$set": {"show_data": ""}}
+    result = collection.update_one(query, update)   
+    
+    text_response = responses[-2]
+
+    print("Categorias",cats)
+    list_pat = get_pat_from_subcategories_more(cats,subcats)
+    print("list pat", list_pat)
+    query = {"user_id": token}
+    update = {"$set": {f"data.pat": list_pat}}
+    result = collection.update_one(query, update)
+
+    if result:
+        query = { "user_id": token}
+        update = {"$set": {"last_question": new_questions[-1]["question_id"]}}
+        result = collection.update_one(query, update)  
+        if result:
+            print("llamo a middle",text_response + ", " + token + ", " + language, new_questions[-1]["question_id"])
+            return middle_question(text_response, token, language)
+    return None
 
 def middle_question(text, token, language):
     try:
@@ -349,6 +412,15 @@ def middle_question(text, token, language):
 
         #obtengo el elemento completo del usuario y me traigo la ultima layer
         response_saved = find_response_by_user(token)
+
+         ## CODIGO PARA VOLVER ATRAS
+        if text == "atras":
+            return back(response_saved["questions"],token, response_saved["responses"],language, response_saved["data"]["cat"], response_saved["data"]["sub_cat"])
+        
+        #Guardo las responses
+        query = {"user_id": token}
+        update = {"$push": {"responses": text}}
+        result = collection.update_one(query, update)
 
         #obtengo la ultima pregunta para saber que tipo de pregunta tengo que mostrar
         last_question = response_saved["last_question"]
@@ -472,24 +544,27 @@ def middle_question(text, token, language):
 
             response += get_complete_question("pregunta2", language)
             response += "<br> <br>" + get_name_cat(list_cats[0]) + "<br>"
-            
-            ques_options = []
-            question = {"question_id": "pregunta2", "options": ques_options}
-            print("Antes del for subcats", list_subcats)
-            for i in range(len(list_subcats)):
-                data = {"id": i+1, "value": str(list_subcats[i][1]), "db_id": str(list_subcats[i][0])}
-                ques_options.append(data)
-                response = response + "<br>" + str(i+1) + ") " + str(list_subcats[i][1])
-            
-            print("Dsp del for subcats")
-            query = {"user_id": token}
-            update = {"$push": {"questions": question}}
-            result = collection.update_one(query, update)
+            try: 
+                ques_options = []
+                question = {"question_id": "pregunta2", "options": ques_options}
+                print("Antes del for subcats", list_subcats)
+                for i in range(len(list_subcats)):
+                    data = {"id": i+1, "value": str(list_subcats[i][1]), "db_id": str(list_subcats[i][0])}
+                    ques_options.append(data)
+                    response = response + "<br>" + str(i+1) + ") " + str(list_subcats[i][1])
+                
+                print("Dsp del for subcats",response)
+                query = {"user_id": token}
+                update = {"$push": {"questions": question}}
+                result = collection.update_one(query, update)
 
-            #Actualizo last_question
-            query = { "user_id": token}
-            update = {"$set": {"last_question": "pregunta2"}}
-            result = collection.update_one(query, update)
+                #Actualizo last_question
+                query = { "user_id": token}
+                update = {"$set": {"last_question": "pregunta2"}}
+                result = collection.update_one(query, update)
+            
+            except Exception as e:
+                print(e)
             
             if result:
                 return response
@@ -517,6 +592,7 @@ def middle_question(text, token, language):
                     if str(opt["id"]) == sel_opt:
                         rta_selected.append(str(opt["db_id"]))
             #---------------
+            print("SaveSubCat",rta_selected)
 
             #--- Paso 3 -----
             query = {"user_id": token}
@@ -607,10 +683,14 @@ def middle_question(text, token, language):
             update = {"$set": {"show_data": "true", "data_2_show": "pat"}}
             result = collection.update_one(query, update)
             
+            ##Guardo para tener el volver a atras
+            query = {"user_id": token}
+            update = {"$push": {"questions": {"question_id": "pregunta3", "options": [] }}}
+            result = collection.update_one(query, update)
 
             #Actualizo last_question
             query = { "user_id": token}
-            update = {"$set": {"last_question": "pregunta2"}}
+            update = {"$set": {"last_question": "pregunta3"}}
             result = collection.update_one(query, update)
 
             if result:
