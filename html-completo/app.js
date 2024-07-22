@@ -136,16 +136,17 @@ class Chatbox {
     let msg1 = { name: "User", message: text1 };
     this.messages.push(msg1);
 
-    fetch("http://127.0.0.1:5000/response", {
-    //fetch("https://31bkbc0a3m.execute-api.us-east-1.amazonaws.com/Prod/test-bot", {
+    // fetch("http://127.0.0.1:5000/response", {
+    fetch("https://31bkbc0a3m.execute-api.us-east-1.amazonaws.com/Prod/test-bot", {
       method: "POST",
-      body: JSON.stringify({ message: text1 }),
-      mode: "cors",
+      body: JSON.stringify({ message: text1, "token": "tokenTestAppJs"}),
+      mode: "no-cors",
       headers: {
-        Authorization: "Bearer " + sessionStorage.getItem("token"),
-        //Authorization: "Bearer skjsdf345dftdbcvsdf",
+        // Authorization: "Bearer " + sessionStorage.getItem("token"),
+        "Authorization": "Bearer skjsdf345dftdbcvsdf",
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Request-Headers": "*",
+        "Access-Control-Request-Method": "*"
       },
     })
       .then((r) => r.json())
